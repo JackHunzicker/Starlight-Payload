@@ -1,0 +1,62 @@
+# BTCPay MAINNET overlay for the VPS. Run from docker/btcpay as:
+#
+#   docker compose -f compose.yml -f compose.mainnet.yml -p btcpay-mainnet up -d
+#
+# Why an overlay rather than edits to compose.yml: that file is a faithful
+# render of the official BTCPay docker project (commit 04d6eee) and stays that
+# way so it can be re-generated. Everything VPS-specific lives here.
+#
+# Two things this changes, both mandatory on the VPS:
+#
+# 1. PRUNING. A full mainnet chain is ~700 GB of DOWNLOAD either way, but
+#    without `prune` it is also ~700 GB of DISK, which this box does not have
+#    to spare next to four databases and the app images. Pruning keeps the
+#    validated UTXO set and discards old blocks. The consequence to know: a
+#    pruned node CANNOT rescan history, so the payment wallet must be created
+#    AFTER this node exists (it is — the mainnet wallet is generated at setup),
+#    and an imported older wallet would not see its past transactions.
+#
+# 2. The published port binds the docker0 gateway, not 0.0.0.0. Docker
+#    publishes past UFW, so 0.0.0.0 would put BTCPay on the public internet
+#    beside Caddy. Bound here it is reachable only from containers and the
+#    host; Caddy fronts it at $PAY_DOMAIN with TLS. Set in .env as
+#    NOREVERSEPROXY_HTTP_PORT=172.17.0.1:7779 — kept there rather than
+#    hardcoded so the address is correctable in one place.
+services:
+  bitcoind:
+    environment:
+      # Same args as the base file plus `prune`. Compose REPLACES a mapped
+      # environment value rather than merging it, so the whole block is
+      # restated — keep it in sync if compose.yml is ever re-generated.
+      # The doubled $$ in rpcauth is a compose escape, not a typo.
+      BITCOIN_EXTRA_ARGS: |-
+        rpcport=43782
+        rpcbind=0.0.0.0:43782
+        rpcallowip=0.0.0.0/0
+        port=39388
+        whitelist=0.0.0.0/0
+        maxmempool=500
+        prune=${BITCOIN_PRUNE_MB:-80000}
+        dbcache=1000
+
+        onion=tor:9050
+        rpcauth=btcrpc:a6a5d29a3f44f02e4cd8cabb5b10a234$$ab6152915515f6a9cca806d2ab5f0e2794c346ba74f812c61e48241d523778b8
+
+        mempoolfullrbf=1
+    deploy:
+      resources:
+        limits:
+          # Initial block download is CPU- and memory-hungry; cap it so the
+          # storefront stays responsive while the chain syncs.
+          memory: 4G
+
+  btcpayserver:
+    environment:
+      BTCPAY_PROTOCOL: https
+      # BTCPay builds absolute URLs (invoice links, webhook callbacks, the
+      # customer redirect) from these. Behind Caddy it cannot infer them.
+      BTCPAY_EXTERNALURL: https://${BTCPAY_HOST}
+    deploy:
+      resources:
+        limits:
+          memory: 2G

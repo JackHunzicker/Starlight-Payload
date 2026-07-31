@@ -1,0 +1,111 @@
+---
+// The Archive — under-construction landing page (owner-approved direction,
+// 2026-07-29). A static page under base /docs/ beats Starlight's injected
+// [...slug] route, needs no Starlight chrome, and lives outside the
+// (formerly volume-shadowed) src/content tree. Tokens are copied from the
+// TLR dark ground in apps/web styles.css — the app boundary means they
+// cannot be imported, only replicated.
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<title>The Archive — Acme Commerce</title>
+	</head>
+	<body>
+		<div class="hairline"></div>
+		<main>
+			<p class="eyebrow">The Acme Commerce Archive</p>
+			<h1>Under construction.</h1>
+			<p class="blurb">
+				Primary literature indexed and cross-referenced, derivative syntheses over closed
+				source material, and our own data added in. The Archive is being assembled.
+			</p>
+			<a class="cta" href="/">Return to the shop</a>
+		</main>
+		<footer>Acme Commerce</footer>
+	</body>
+</html>
+
+<style>
+	:root {
+		--bg: #070b16;
+		--ink: #eef4ff;
+		--ink-2: #8ea2c4;
+		--ink-5: #5f7099;
+		--rule: #16203a;
+		--accent: #74cde6;
+		--hero: radial-gradient(90% 130% at 50% 8%, #1a2a55 0%, #101a35 34%, #070b16 74%);
+	}
+	* {
+		margin: 0;
+		box-sizing: border-box;
+	}
+	html,
+	body {
+		height: 100%;
+	}
+	body {
+		display: flex;
+		flex-direction: column;
+		background: var(--bg);
+		color: var(--ink);
+		font-family: Inter, -apple-system, 'Segoe UI', sans-serif;
+		text-align: center;
+	}
+	.hairline {
+		height: 2px;
+		background: linear-gradient(90deg, #8f86e4 0%, #9b90ea 11%, #b4acf2 22%, #a5e0f2 32%, #74cde6 40%, #5fc8f5 46%, #4fbef8 50%, #5fc8f5 54%, #74cde6 60%, #63ecc4 74%, #3fd9a8 87%, #17a97f 100%);
+	}
+	main {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 26px;
+		padding: 64px max(40px, calc((100% - 1200px) / 2));
+		background: var(--hero);
+	}
+	.eyebrow {
+		font-family: 'JetBrains Mono', ui-monospace, monospace;
+		font-size: 12.5px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--accent);
+	}
+	h1 {
+		font-size: clamp(34px, 5vw, 46px);
+		line-height: 1.1;
+		font-weight: 600;
+		letter-spacing: -0.024em;
+	}
+	.blurb {
+		max-width: 62ch;
+		font-size: 17.5px;
+		line-height: 1.62;
+		color: var(--ink-2);
+	}
+	.cta {
+		padding: 10px 21px;
+		border-radius: 9px;
+		background: linear-gradient(104deg, #9a8bec 0%, #7fb4ee 38%, #63cbe8 62%, #5fdcb4 100%);
+		border: 1px solid #b3a6f2;
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.5),
+			0 0 16px rgba(126, 110, 228, 0.3);
+		color: #0d1230;
+		font-size: 12.5px;
+		font-weight: 650;
+		text-decoration: none;
+	}
+	footer {
+		padding: 22px;
+		border-top: 1px solid var(--rule);
+		font-size: 11.5px;
+		color: var(--ink-5);
+	}
+</style>

@@ -1,0 +1,13 @@
+# Normalize text files; enforce LF where Linux containers consume the file directly.
+# Shell scripts destined for images or postgres initdb MUST be LF — CRLF shebangs
+# fail silently inside alpine/debian containers.
+* text=auto
+
+*.sh text eol=lf
+*.sql text eol=lf
+*.template text eol=lf
+Caddyfile text eol=lf
+*.Caddyfile text eol=lf
+
+# PowerShell is Windows-native tooling.
+*.ps1 text eol=crlf

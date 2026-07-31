@@ -1,0 +1,219 @@
+# PRODUCTION overlay — run as:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# (never with the dev override; see docker/.env.production.example for the env.)
+#
+# Posture (infra audit §6.1, accepted): Caddy is the ONLY service publishing
+# ports (80/443). Everything else lives on internal networks:
+#   edge — Caddy ↔ the services it proxies (fixed subnet so Authentik's
+#          trusted-proxy CIDR is deterministic)
+#   app  — service-to-service calls (web→vendure, worker→web, web→starlight,
+#          web→vendure, web→starlight)
+#   data — postgres/redis and their consumers; internal (no egress)
+#
+# Local rehearsal: add --profile rehearsal for the mailpit SMTP sink, and use
+# *.localhost domains (Caddy issues an internal CA cert automatically).
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  caddy:
+    # Pinned minor: verify the current 2.x at upgrade time; auto-TLS config is
+    # stable across 2.x. Stock image — the Sharkey wordmark is handled by the
+    # instance stylesheet overlay, not at the edge.
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    # Defaults are the real 80/443 (VPS). The rehearsal env remaps to
+    # 8080/8443 because another local service may hold ports 80 and 443 on the dev machine.
+    ports:
+      - "${CADDY_HTTP_PORT:-80}:80"
+      - "${CADDY_HTTPS_PORT:-443}:443"
+      - "${CADDY_HTTPS_PORT:-443}:443/udp"   # HTTP/3
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+      TLR_DOMAIN: ${TLR_DOMAIN}
+      TGP_DOMAIN: ${TGP_DOMAIN}
+      SNM_DOMAIN: ${SNM_DOMAIN}
+      COMMUNITY_DOMAIN: ${COMMUNITY_DOMAIN}
+      VENDURE_DOMAIN: ${VENDURE_DOMAIN}
+      # Redirect-only domains (301 to the primaries with real certs).
+      SNM_REDIRECT_DOMAIN: ${SNM_REDIRECT_DOMAIN}
+      TGP_REDIRECT_DOMAIN: ${TGP_REDIRECT_DOMAIN}
+      # BTCPay lives in its own compose project (docker/btcpay) because only one
+      # service may own 80/443. Unset → the Caddyfile falls back to an .invalid
+      # host, so the block is inert until BTCPay is actually deployed.
+      PAY_DOMAIN: ${PAY_DOMAIN:-}
+      BTCPAY_UPSTREAM: ${BTCPAY_UPSTREAM:-172.17.0.1:7779}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
+    depends_on:
+      - web
+      - vendure-server
+      - sharkey
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *default-logging
+
+  postgres:
+    networks:
+      - data
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    logging: *default-logging
+
+  web:
+    networks:
+      - edge
+      - app
+      - data
+    build:
+      args:
+        # Baked into the client bundle — the primary storefront origin.
+        NEXT_PUBLIC_SERVER_URL: https://${TLR_DOMAIN}
+        NEXT_PUBLIC_COMMUNITY_URL: https://${COMMUNITY_DOMAIN}
+    environment:
+      NEXT_PUBLIC_SERVER_URL: https://${TLR_DOMAIN}
+      AUTH_URL: https://${TLR_DOMAIN}
+      # All public origins this app answers on (CORS/CSRF allowlist).
+      PAYLOAD_PUBLIC_ORIGINS: https://${TLR_DOMAIN},https://${TGP_DOMAIN},https://${SNM_DOMAIN}
+      # Unknown Host headers 404 instead of falling back to TLR.
+      TENANT_STRICT_HOSTS: "true"
+      NEXT_PUBLIC_VENDURE_API_URL: https://${VENDURE_DOMAIN}/shop-api
+      NEXT_PUBLIC_COMMUNITY_URL: https://${COMMUNITY_DOMAIN}
+      # Tailnet address once the VPS joins the tailnet (§6.5 — one mechanism,
+      # no host.docker.internal in production).
+      PUCK_AI_BRIDGE_URL: ${PUCK_AI_BRIDGE_URL:-}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Acme Commerce}
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    logging: *default-logging
+
+  vendure-server:
+    networks:
+      - edge
+      - app
+      - data
+    environment:
+      CORS_ORIGINS: https://${TLR_DOMAIN},https://${TGP_DOMAIN},https://${SNM_DOMAIN}
+      EMAIL_DEV_MODE: "false"
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Acme Commerce}
+      PUBLIC_SHOP_URL: https://${TLR_DOMAIN}
+      VENDURE_ASSET_URL_PREFIX: https://${VENDURE_DOMAIN}/assets/
+      BTCPAY_REDIRECT_URL: https://${TLR_DOMAIN}/checkout/complete/
+      PAYMENTO_API_KEY: ${PAYMENTO_API_KEY:-}
+      PAYMENTO_IPN_SECRET: ${PAYMENTO_IPN_SECRET:-}
+      PAYMENTO_REDIRECT_URL: https://${TLR_DOMAIN}/checkout/complete/
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+    logging: *default-logging
+
+  vendure-worker:
+    networks:
+      - app
+      - data
+    environment:
+      # The EmailPlugin's send jobs execute on the WORKER — it needs the full
+      # email environment or transactional mail dies silently in the queue.
+      EMAIL_DEV_MODE: "false"
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Acme Commerce}
+      PUBLIC_SHOP_URL: https://${TLR_DOMAIN}
+      VENDURE_ASSET_URL_PREFIX: https://${VENDURE_DOMAIN}/assets/
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+    logging: *default-logging
+
+  starlight:
+    build:
+      # Static-built SSR, no TinaCMS dev server, admin SPA stripped.
+      target: production
+    networks:
+      - app
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging: *default-logging
+
+  sharkey:
+    networks:
+      - edge
+      - data
+    logging: *default-logging
+
+  # Needs `data` to reach sharkey by service name. In the base file it inherits
+  # the default network; the prod overlay has no default, so without this the
+  # rebrand would fail to resolve the host and retry until it gave up.
+  sharkey-rebrand:
+    networks:
+      - data
+    logging: *default-logging
+
+  sharkey-redis:
+    networks:
+      - data
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    logging: *default-logging
+
+
+
+  mailpit:
+    image: axllent/mailpit:v1.30
+    profiles:
+      - rehearsal
+    restart: unless-stopped
+    ports:
+      - "8025:8025"   # web UI (rehearsal is local-only, so publishing is fine)
+    networks:
+      - app
+    logging: *default-logging
+
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: ${EDGE_SUBNET:-172.28.0.0/24}
+  app:
+  data:
+    internal: true
+
+volumes:
+  caddy-data:
+  caddy-config:

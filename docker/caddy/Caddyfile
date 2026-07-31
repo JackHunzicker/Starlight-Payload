@@ -1,0 +1,123 @@
+# Acme Commerce production edge. Domains come from the environment
+# (docker-compose.prod.yml passes them from docker/.env) — one Caddyfile for
+# rehearsal (*.localhost → internal CA) and production (ACME).
+#
+# Posture: explicit site blocks per KNOWN hostname; anything else is rejected —
+# port 80 answers 421, port 443 fails the TLS handshake naturally because no
+# certificate exists for unlisted names. Parked/alias domains (the Namecheap
+# map) get one-line redirect blocks here when DNS lands.
+
+{
+	email {$ACME_EMAIL}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "SAMEORIGIN"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+}
+
+(storefront) {
+	import security_headers
+	encode zstd gzip
+	request_body {
+		max_size 100MB
+	}
+	reverse_proxy web:7773
+}
+
+# --- Storefronts (one Next.js app, brand resolved from Host) ---
+{$TLR_DOMAIN} {
+	import storefront
+}
+www.{$TLR_DOMAIN} {
+	redir https://{$TLR_DOMAIN}{uri} permanent
+}
+
+{$TGP_DOMAIN} {
+	import storefront
+}
+www.{$TGP_DOMAIN} {
+	redir https://{$TGP_DOMAIN}{uri} permanent
+}
+
+{$SNM_DOMAIN} {
+	import storefront
+}
+www.{$SNM_DOMAIN} {
+	redir https://{$SNM_DOMAIN}{uri} permanent
+}
+
+# --- Redirect-only domains (the operator Namecheap map): they carry A/AAAA at this
+#     box so the redirects work over HTTPS with real certs. The .invalid
+#     defaults keep the Caddyfile parseable when the vars are unset. ---
+{$SNM_REDIRECT_DOMAIN:snm-redirect.invalid} {
+	redir https://{$SNM_DOMAIN}{uri} permanent
+}
+www.{$SNM_REDIRECT_DOMAIN:snm-redirect.invalid} {
+	redir https://{$SNM_DOMAIN}{uri} permanent
+}
+
+{$TGP_REDIRECT_DOMAIN:tgp-redirect.invalid} {
+	redir https://{$TGP_DOMAIN}{uri} permanent
+}
+www.{$TGP_REDIRECT_DOMAIN:tgp-redirect.invalid} {
+	redir https://{$TGP_DOMAIN}{uri} permanent
+}
+
+# --- Vendure (shop-api for browsers, the React Dashboard, assets) ---
+{$VENDURE_DOMAIN} {
+	import security_headers
+	encode zstd gzip
+	request_body {
+		max_size 50MB
+	}
+
+	# The legacy Angular admin was retired 2026-07-31 (Vendure drops support for
+	# it after July 2026). These keep old bookmarks working. The matchers are
+	# exact-path and `/admin/*`, so the `/admin-api` GraphQL endpoint — which
+	# does NOT match either — is untouched.
+	redir /admin /dashboard/ permanent
+	redir /admin/* /dashboard/ permanent
+
+	reverse_proxy vendure-server:7774
+}
+
+
+# --- Community (websockets proxy transparently) ---
+#
+# The Sharkey wordmark is removed by the instance-wide stylesheet overlay
+# (apps/sharkey/style.css, bind-mounted in docker-compose.yml) — not here,
+# so it also applies in dev and needs no reverse-proxy plugin.
+{$COMMUNITY_DOMAIN} {
+	import security_headers
+	encode zstd gzip
+	request_body {
+		max_size 260MB
+	}
+	reverse_proxy sharkey:7777
+}
+
+# --- BTCPay Server (SEPARATE compose project — docker/btcpay, project
+#     `btcpay-mainnet`). Caddy owns 80/443, so BTCPay's own bundled proxy is
+#     never used; it publishes on the docker0 gateway only
+#     (NOREVERSEPROXY_HTTP_PORT=172.17.0.1:7779), which keeps it off the public
+#     internet while staying reachable from this container. BTCPAY_UPSTREAM is
+#     env-driven so the address can be corrected without editing this file.
+#     Customers land here from checkout, so it must be publicly resolvable.
+{$PAY_DOMAIN:pay-host.invalid} {
+	import security_headers
+	encode zstd gzip
+	reverse_proxy {$BTCPAY_UPSTREAM:172.17.0.1:7779}
+}
+
+# --- Reject unknown hosts on plain HTTP (ACME challenges are handled before
+#     site routing, so this cannot interfere with issuance). ---
+:80 {
+	respond "Misdirected request." 421
+}

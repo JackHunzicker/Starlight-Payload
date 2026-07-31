@@ -1,0 +1,5 @@
+.env
+sessions.json
+sessions.json.tmp
+workdir/
+logs/

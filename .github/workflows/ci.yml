@@ -1,0 +1,45 @@
+# CI gate (§7.12): static verification on every push/PR. The DB-backed int
+# suite and e2e stay a local pre-ship discipline (they need the live compose
+# stack); this gate holds the line on types, lint, leaked secrets, and NEW
+# critical advisories.
+name: ci
+
+on:
+  push:
+    branches: [master, mvp-storefront-launch]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm 11.16.0 (repo-pinned)
+        run: corepack enable && corepack prepare pnpm@11.16.0 --activate
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm type-check
+
+      - name: Lint
+        run: pnpm --filter web lint
+
+      # Working-tree scan only: history predates the runtime-secrets
+      # consolidation and is accepted (working-tree scan).
+      - name: Secret scan
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz \
+            | tar -xz gitleaks
+          ./gitleaks dir . --no-banner --redact
+
+      - name: Audit gate (fail on criticals; full report is informational)
+        run: |
+          pnpm audit --audit-level critical
+          pnpm audit || true

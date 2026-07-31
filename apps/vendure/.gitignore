@@ -1,0 +1,7 @@
+node_modules
+dist
+admin-ui
+.tanstack
+.vendure-dashboard-temp
+static/assets
+static/email/test-emails

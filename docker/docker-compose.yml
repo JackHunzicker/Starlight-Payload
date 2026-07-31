@@ -1,0 +1,288 @@
+# Port publications live in docker-compose.override.yml (auto-loaded in dev).
+# Production (docker-compose.yml + docker-compose.prod.yml) publishes ONLY
+# Caddy's 80/443 — running the base file alone serves nothing on the host.
+services:
+  # === CORE DATABASE ===
+  postgres:
+    # Pinned by digest: unpinned postgres:17 drifted (glibc 2.36->2.41) and caused
+    # collation-version mismatches across all databases. Update deliberately, then
+    # run ALTER DATABASE ... REFRESH COLLATION VERSION + REINDEX on every DB.
+    image: postgres:17@sha256:5c855ad7b85e68e48a62f34662853f38b57c1c1d80f3a927ab58034fd6d31c5e
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: platform_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Consumed only by init-databases.sh on an EMPTY datadir (first boot) —
+      # postgres runs initdb *.sh with env access, so no password is tracked.
+      PAYLOAD_DB_PASSWORD: ${PAYLOAD_DB_PASSWORD}
+      VENDURE_DB_PASSWORD: ${VENDURE_DB_PASSWORD}
+      SHARKEY_DB_PASSWORD: ${SHARKEY_DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform_admin"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # === PAYLOAD CMS (Next.js) ===
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_SERVER_URL: http://localhost:7773
+        # IMPORTANT: Next.js rewrites are baked at build time. Changing this
+        # requires a full rebuild (docker compose build web) to take effect.
+        STARLIGHT_URL: http://starlight:7776
+        # Also baked: NEXT_PUBLIC_* reaches client components only via the build.
+        NEXT_PUBLIC_COMMUNITY_URL: http://localhost:7777
+      # Secrets ride BuildKit secret mounts (never ARG/ENV — those persist in
+      # `docker history`). Build-time prerender needs the DB; the build container
+      # is not on the compose network, so it reaches postgres via the
+      # host-published port (Docker Desktop). The VPS build strategy is decided
+      # at rehearsal (deploy/README.md).
+      secrets:
+        - web_build_database_url
+        - payload_secret
+    volumes:
+      # Payload media uploads live on local disk — without this mount the container
+      # can't serve files uploaded from local dev, and its own uploads vanish on recreate.
+      - ../apps/web/media:/app/apps/web/media
+    env_file:
+      # Local Auth.js/Authentik credentials live here. Explicit service variables
+      # below still override database and container-network addresses.
+      - ../apps/web/.env
+    environment:
+      DATABASE_URL: postgres://payload_user:${PAYLOAD_DB_PASSWORD_URLENC}@postgres:5432/payload_db
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      NEXT_PUBLIC_SERVER_URL: http://localhost:7773
+      PAYLOAD_ADMIN_EMAIL: ${PAYLOAD_ADMIN_EMAIL}
+      PAYLOAD_ADMIN_PASSWORD: ${PAYLOAD_ADMIN_PASSWORD}
+      VENDURE_WEBHOOK_SECRET: ${VENDURE_WEBHOOK_SECRET}
+      AUTH_URL: http://localhost:7773
+      AUTH_TRUST_HOST: "true"
+      NEXT_PUBLIC_VENDURE_API_URL: http://localhost:7774/shop-api
+      # Where editor `{community}` CTA links resolve to (the Sharkey instance).
+      NEXT_PUBLIC_COMMUNITY_URL: http://localhost:7777
+      VENDURE_INTERNAL_URL: http://vendure-server:7774/shop-api
+      # Community invites. Sharkey cannot consume OIDC, so store customers are
+      # let in with an invite code minted through its admin API — these
+      # credentials never reach the browser.
+      SHARKEY_INTERNAL_URL: http://sharkey:7777
+      SHARKEY_ADMIN_USERNAME: ${SHARKEY_ADMIN_USERNAME:-}
+      SHARKEY_ADMIN_PASSWORD: ${SHARKEY_ADMIN_PASSWORD:-}
+      # Puck AI bridge runs on the Windows host (never in a container) —
+      # reach it via the Docker Desktop host alias. Mode + secret come from
+      # apps/web/.env via env_file.
+      PUCK_AI_BRIDGE_URL: http://host.docker.internal:8765
+      # Note: STARLIGHT_URL runtime env is kept for reference but Next.js rewrites
+      # are baked at build time from the build arg above. This has no effect at runtime.
+      STARLIGHT_URL: http://starlight:7776
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7773/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  # === VENDURE SERVER ===
+  vendure-server:
+    build:
+      context: ..
+      dockerfile: apps/vendure/Dockerfile
+    volumes:
+      - ../apps/vendure/static:/app/apps/vendure/static
+    environment:
+      APP_ENV: production
+      PORT: 7774
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: vendure_db
+      DB_USERNAME: vendure_user
+      DB_PASSWORD: ${VENDURE_DB_PASSWORD}
+      COOKIE_SECRET: ${COOKIE_SECRET}
+      # Non-secret identifier is tracked so Vendure's insecure `superadmin`
+      # default cannot return during a recreate. The password remains secret.
+      SUPERADMIN_USERNAME: ${VENDURE_ADMIN_IDENTIFIER:-admin@commerce.example.com}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD}
+      VENDURE_WEBHOOK_SECRET: ${VENDURE_WEBHOOK_SECRET}
+      PAYLOAD_SYNC_URL: http://web:7773/api/vendure-sync
+      CORS_ORIGINS: http://localhost:7773,http://localhost:7774
+      BTCPAY_SERVER_URL: ${BTCPAY_SERVER_URL:-}
+      BTCPAY_STORE_ID: ${BTCPAY_STORE_ID:-}
+      BTCPAY_API_KEY: ${BTCPAY_API_KEY:-}
+      BTCPAY_WEBHOOK_SECRET: ${BTCPAY_WEBHOOK_SECRET:-}
+      BTCPAY_REDIRECT_URL: ${BTCPAY_REDIRECT_URL:-http://localhost:7773/checkout/complete/}
+      PAYMENTO_API_KEY: ${PAYMENTO_API_KEY:-}
+      PAYMENTO_IPN_SECRET: ${PAYMENTO_IPN_SECRET:-}
+      PAYMENTO_REDIRECT_URL: ${PAYMENTO_REDIRECT_URL:-http://localhost:7773/checkout/complete/}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7774/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  # === VENDURE WORKER ===
+  vendure-worker:
+    build:
+      context: ..
+      dockerfile: apps/vendure/Dockerfile
+    command: ["node", "dist/index-worker.js"]
+    volumes:
+      - ../apps/vendure/static:/app/apps/vendure/static
+    environment:
+      APP_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: vendure_db
+      DB_USERNAME: vendure_user
+      DB_PASSWORD: ${VENDURE_DB_PASSWORD}
+      COOKIE_SECRET: ${COOKIE_SECRET}
+      # The worker bootstraps the same Vendure core as the server, including the
+      # "ensure a superadmin exists" step. Without these it looks the account up
+      # by an UNDEFINED identifier, finds nothing, and tries to insert an
+      # administrator with a null emailAddress — which the schema rejects, so the
+      # worker crash-loops. Observed on the production box 2026-07-30.
+      SUPERADMIN_USERNAME: ${VENDURE_ADMIN_IDENTIFIER:-admin@commerce.example.com}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD}
+      # The payload-sync job queue executes on the worker, not the server —
+      # without these the sync silently falls back to localhost and fails.
+      PAYLOAD_SYNC_URL: http://web:7773/api/vendure-sync
+      VENDURE_WEBHOOK_SECRET: ${VENDURE_WEBHOOK_SECRET}
+      # The community-invite job runs on the WORKER, so the URL lives here too.
+      COMMUNITY_INVITE_URL: http://web:7773/api/community/auto-invite/
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vendure-server:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      # index-worker starts Vendure's worker health server on :3020 once the
+      # job queue is live — a failed bootstrap now exits (visible) instead of
+      # idling as a healthy-looking zombie.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3020/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  # === STARLIGHT DOCS + TINACMS (Live Editing) ===
+  starlight:
+    build:
+      context: ..
+      dockerfile: apps/starlight/Dockerfile
+      # Dev target = TinaCMS live editing. docker-compose.prod.yml overrides to
+      # the `production` target (static-built SSR, Tina admin stripped).
+      target: dev
+    # The former starlight-content volume mount shadowed src/content and kept
+    # serving deleted docs after rebuilds. Removed 2026-07-29 with the content
+    # scrub: /docs/ is a static under-construction page, so content ships in
+    # the image like any code change. Re-evaluate a mount only if live Tina
+    # editing returns with real Archive content.
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7776/docs/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  # === SHARKEY (Social) ===
+  sharkey:
+    # Pinned tag: :latest is a time bomb here — the release after 2025.4.7 is a large
+    # Misskey-2025.5.0 rebase, and the entrypoint auto-migrates the DB on first start.
+    # Upgrade deliberately: pg_dump sharkey_db first, then bump this tag.
+    image: registry.activitypub.software/transfem-org/sharkey:2025.4.7
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ../apps/sharkey/.config:/sharkey/.config:ro
+      - sharkey-files:/sharkey/files
+      # Instance-wide CSS. base.pug inlines this file into every page's
+      # <head>, and it is the ONLY instance-wide hook this version has (its
+      # `customCss` is per-browser localStorage). Our copy is Sharkey's
+      # original plus the rules that hide the hardcoded wordmark — works in
+      # dev and production alike, no reverse-proxy plugin involved.
+      # Re-diff against upstream if the pinned image tag is ever bumped.
+      - ../apps/sharkey/style.css:/sharkey/packages/backend/built/server/web/style.css:ro
+      # Empty-state art. Sharkey ships cartoon characters here and there is no
+      # admin setting for them — the meta fields that used to point at these
+      # were dropped upstream, so leaving them null just serves the bundled
+      # files. Same bind-mount trick as style.css. Rendered from
+      # apps/sharkey/status/mark.svg; re-render if the brand mark changes.
+      - ../apps/sharkey/status/error.png:/sharkey/packages/frontend/assets/status/error.png:ro
+      - ../apps/sharkey/status/nothinghere.png:/sharkey/packages/frontend/assets/status/nothinghere.png:ro
+      - ../apps/sharkey/status/missingpage.webp:/sharkey/packages/frontend/assets/status/missingpage.webp:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      sharkey-redis:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7777/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
+  # Re-applies the Acme Commerce identity every time the stack comes up, then
+  # VERIFIES it and exits non-zero if any upstream branding is still reachable.
+  #
+  # A service rather than a documented manual step, because these settings live
+  # in the DATABASE, not in this file. An image bump, a restore, or an upstream
+  # migration that renames a field reverts them silently, and the failure mode
+  # is a member seeing Sharkey's mascot or a link to activitypub.software.
+  # `on-failure` retries because sharkey's healthcheck can pass a moment before
+  # its API will accept an admin sign-in.
+  sharkey-rebrand:
+    image: node:24-alpine
+    restart: on-failure:5
+    depends_on:
+      sharkey:
+        condition: service_healthy
+    volumes:
+      - ../apps/sharkey:/s:ro
+    environment:
+      SHARKEY_URL: http://sharkey:7777
+      SHARKEY_ADMIN_USERNAME: ${SHARKEY_ADMIN_USERNAME}
+      SHARKEY_ADMIN_PASSWORD: ${SHARKEY_ADMIN_PASSWORD}
+      TLR_PUBLIC_URL: ${TLR_PUBLIC_URL:-https://example.com}
+    command: ["node", "/s/rebrand.mjs"]
+
+  sharkey-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - sharkey-redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+
+volumes:
+  postgres-data:
+  sharkey-files:
+  sharkey-redis-data:
+
+# BuildKit build secrets, sourced from docker/.env at compose time. Runtime env
+# is unchanged — these exist only inside `RUN --mount=type=secret` steps.
+secrets:
+  web_build_database_url:
+    environment: WEB_BUILD_DATABASE_URL
+  payload_secret:
+    environment: PAYLOAD_SECRET

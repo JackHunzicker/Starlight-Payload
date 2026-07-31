@@ -1,0 +1,17 @@
+[Unit]
+Description=Acme Commerce nightly backup (pg dumps + restic offsite)
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=BACKUP_ENV_FILE=/etc/acme-commerce/backup.env
+# systemd units start with no $HOME, so restic cannot find a cache directory and
+# warns "unable to open cache" on every run. It still completes, but re-reads
+# the repository index each night instead of reusing it — slower, and more
+# traffic over the tailnet to the operator machine for no benefit.
+Environment=RESTIC_CACHE_DIR=/var/cache/restic
+CacheDirectory=restic
+ExecStart=/bin/bash -c 'REPO_DIR=$(grep -E "^REPO_DIR=" /etc/acme-commerce/backup.env | cut -d= -f2-); exec "$REPO_DIR/deploy/backup.sh"'
+Nice=10
+IOSchedulingClass=idle

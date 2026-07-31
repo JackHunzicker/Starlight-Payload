@@ -1,0 +1,40 @@
+# Dependencies - reinstalled in container
+**/node_modules
+
+# Build outputs
+**/.next
+**/dist
+**/.astro
+**/tina/__generated__
+
+# Env files & secrets — never ship into image layers. Runtime env is injected via
+# compose `env_file:` at container start; the build needs no committed env file.
+**/.env
+**/.env.*
+!**/.env.example
+
+# IDE
+**/.vscode
+**/.idea
+
+# Git
+.git
+.gitignore
+
+# Docker (keep Dockerfiles for multi-stage builds)
+docker/*.sql
+docker/*.env
+
+# Test artifacts
+**/coverage
+**/.playwright
+
+# Misc
+**/*.log
+**/.DS_Store
+**/Thumbs.db
+
+# Vendure devMode writes rendered order emails here — real order/customer
+# data must never enter a build context (they were not ignored; caught in the
+# 2026-07-29 infrastructure audit).
+apps/vendure/static/email/test-emails/

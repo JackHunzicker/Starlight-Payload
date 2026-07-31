@@ -1,0 +1,43 @@
+{
+  "name": "vendure",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev:server": "ts-node ./src/index.ts",
+    "dev:worker": "ts-node ./src/index-worker.ts",
+    "dev:dashboard": "vite --clearScreen false",
+    "dev": "concurrently --kill-others \"pnpm run dev:server\" \"pnpm run dev:worker\" \"pnpm run dev:dashboard\"",
+    "build": "tsc",
+    "build:dashboard": "vite build",
+    "type-check": "tsc --noEmit",
+    "test": "node --test --require ts-node/register ./src/**/*.test.ts",
+    "migrate": "node ./dist/migrate.js",
+    "configure:mvp": "node ./dist/scripts/configure-mvp.js",
+    "admin:rotate-identifier": "node ./dist/scripts/rotate-admin-identifier.js",
+    "start:server": "node ./dist/index.js",
+    "start:worker": "node ./dist/index-worker.js",
+    "start": "concurrently \"pnpm run start:server\" \"pnpm run start:worker\""
+  },
+  "dependencies": {
+    "@nestjs/common": "11.1.12",
+    "@vendure/asset-server-plugin": "3.7.1",
+    "@vendure/common": "3.7.1",
+    "@vendure/core": "3.7.1",
+    "@vendure/dashboard": "3.7.1",
+    "@vendure/email-plugin": "3.7.1",
+    "@vendure/graphiql-plugin": "3.7.1",
+    "@vendure/harden-plugin": "3.7.1",
+    "bcrypt": "^6.0.0",
+    "dotenv": "17.2.3",
+    "pg": "8.18.0",
+    "typeorm": "0.3.28"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@vendure/cli": "3.7.1",
+    "concurrently": "9.2.1",
+    "ts-node": "^10.9.2",
+    "typescript": "5.9.3",
+    "vite": "7.3.1"
+  }
+}

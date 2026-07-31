@@ -1,0 +1,61 @@
+packages:
+  - apps/*
+  - packages/*
+
+overrides:
+  '@tiptap/core': 3.28.0
+  '@tiptap/pm': 3.28.0
+  '@tiptap/react': 3.28.0
+  # --- Security overrides (2026-07-29 audit loop). Ranged selectors patch the
+  # vulnerable range in place without disturbing other majors. Each target
+  # verified to exist on npm; re-audit after any change: pnpm audit.
+  'multer@<2.2.0': ^2.2.0 # DoS trio via @nestjs/platform-express
+  '@apollo/server@>=4.2.0 <4.13.0': ^4.13.0 # startStandaloneServer DoS (Vendure GraphQL)
+  'ws@>=8.0.0 <8.21.0': ^8.21.0 # fragment-flood DoS
+  'form-data@>=4.0.0 <4.0.6': ^4.0.6 # CRLF injection
+  'fast-uri@>=3.0.0 <3.1.4': ^3.1.4 # host-confusion set (ajv resolver)
+  'js-cookie@>=3.0.0 <3.0.8': ^3.0.8 # prototype hijack
+  'js-yaml@>=4.0.0 <4.3.0': ^4.3.0 # merge-key quadratic CPU
+  'postcss@>=8.0.0 <8.5.18': ^8.5.18 # source-map path traversal (runtime dep: puck styles)
+  'path-to-regexp@<0.1.13': 0.1.13 # ReDoS (express 4 line)
+  'path-to-regexp@>=8.0.0 <8.4.0': ^8.4.0 # sequential-delimiter DoS
+  'shell-quote@<1.8.4': ^1.8.4 # newline-escape critical (concurrently, dev-only)
+  'sharp@<0.35.0': ^0.35.3 # libvips CVE set; also patches next's nested copy
+  'minimatch@<3.1.4': ^3.1.4 # ReDoS set (3.x line)
+  'brace-expansion@>=2.0.0 <2.1.2': ^2.1.2 # exponential expansion DoS
+  '@isaacs/brace-expansion@<5.0.1': ^5.0.1 # unbounded expansion DoS
+  'picomatch@>=2.0.0 <2.3.2': ^2.3.2 # extglob ReDoS
+  'flatted@<3.4.2': ^3.4.2 # parse() recursion DoS + prototype pollution
+  'linkify-it@>=5.0.0 <5.0.2': ^5.0.2 # quadratic scan DoS
+  'js-yaml@>=3.0.0 <3.15.0': ^3.15.0 # merge-key quadratic CPU (3.x line)
+  'immutable@>=4.0.0 <4.3.9': ^4.3.9 # trie overflow / hash-collision DoS
+  'immutable@<3.8.3': ^3.8.3 # prototype pollution (3.x line)
+  'http-proxy-middleware@>=3.0.0 <3.0.7': ^3.0.7 # multipart field injection
+  'ws@>=7.0.0 <7.5.11': ^7.5.11 # fragment-flood DoS (7.x line)
+  'happy-dom@>=15.10.0 <20.8.9': ^20.8.9 # fetch-credentials leak (lexical/puck prod chain)
+  'serialize-javascript@<7.0.3': ^7.0.3 # RegExp.flags RCE
+  'rollup@>=4.0.0 <4.59.0': ^4.59.0 # path-traversal file write (build tooling)
+  # Triage-accepted, documented in the audit disposition note: vite dev-server
+  # advisories (dev containers only), lodash/_.template + js-cookie@2 (no
+  # patched release exists; tina editor / admin-ui surfaces).
+
+allowBuilds:
+  '@apollo/protobufjs': true
+  '@nestjs/core': true
+  bcrypt: true
+  better-sqlite3: true
+  core-js: false
+  esbuild: true
+  msw: false
+  sharp: true
+  unrs-resolver: true
+
+minimumReleaseAgeExclude:
+  # Already present in the validated 2026-07-22 lockfile before this workspace
+  # adopted pnpm 11's default 24-hour release quarantine.
+  - postcss@8.5.22
+  # Latest AI SDK v6 line compatible with current @puckeditor/plugin-ai 0.7;
+  # admitted together and covered by the web build/test/browser verification.
+  - '@ai-sdk/gateway@3.0.156'
+  - ai@6.0.234
+  - isomorphic-dompurify@3.20.0

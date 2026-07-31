@@ -1,0 +1,32 @@
+# DEV overlay — auto-loaded by plain `docker compose up`, so local development
+# behaves exactly as before the base/override split: every service published on
+# its historical host port. Production runs WITHOUT this file:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  web:
+    ports:
+      - "7773:7773"
+
+  vendure-server:
+    ports:
+      # 7774 serves the API and the React Dashboard at /dashboard. 7775 was the
+      # legacy Angular admin's own server; that plugin was removed 2026-07-31.
+      - "7774:7774"
+
+  starlight:
+    ports:
+      - "7776:7776"
+      - "4001:4001"  # TinaCMS GraphQL/dev server
+    environment:
+      HOST: 0.0.0.0
+      PORT: 7776
+      TINA_PUBLIC_IS_LOCAL: "true"
+
+  sharkey:
+    ports:
+      - "7777:7777"
+

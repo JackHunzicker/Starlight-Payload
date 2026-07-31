@@ -1,0 +1,42 @@
+# Sharkey configuration TEMPLATE for Acme Commerce.
+#
+# The real default.yml is RENDERED from this file and is gitignored — run
+#   deploy/render-configs.ps1   (Windows dev)
+#   deploy/render-configs.sh    (VPS)
+# after changing this template or any tokenized value in docker/.env.
+# Tokens come from docker/.env; rendering fails on unresolved tokens.
+
+# Canonical URL. ONE-WAY once federation is ever enabled — the domain bakes
+# into ActivityPub identity. Local dev uses the Tailscale address; production
+# uses the real community hostname behind Caddy.
+url: ${SHARKEY_URL}
+port: 7777
+
+# Setup password for first-time admin creation (only consulted while the
+# instance has no admin account — i.e. fresh datadir or clean rehearsal).
+setupPassword: ${SHARKEY_SETUP_PASSWORD}
+
+db:
+  host: postgres
+  port: 5432
+  db: sharkey_db
+  user: sharkey_user
+  pass: ${SHARKEY_DB_PASSWORD}
+
+redis:
+  host: sharkey-redis
+  port: 6379
+
+# ID generation format - CANNOT be changed after first run
+id: aidx
+
+# Behind a reverse proxy (Caddy in production)
+proxyRemoteAddress: true
+
+# File upload limits
+maxFileSize: 262144000 # 250MB
+
+# Federation DISABLED (isolated instance)
+# Per Mission 7 scope - no external ActivityPub connections
+# Note: Federation is configured via Admin Panel > Moderation in Sharkey
+# After initial setup, disable federation there

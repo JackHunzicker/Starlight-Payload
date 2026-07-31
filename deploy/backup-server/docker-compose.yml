@@ -1,0 +1,45 @@
+# Backup destination — runs on the operator HOME machine, not the VPS.
+#
+# restic's own REST backend. Chosen over a cloud bucket (the owner: no more monthly
+# bills) and over SFTP (no Windows OpenSSH setup, and rest-server is the
+# faster, first-class restic backend).
+#
+# Reachable from the VPS over Tailscale once the VPS joins the tailnet, which
+# is already part of migration day (the Puck AI bridge needs it too). No port
+# is exposed to the internet — the bind address below is the tailnet
+# interface, so only tailnet devices can reach it.
+#
+#   cd deploy/backup-server && docker compose up -d
+#
+# APPEND-ONLY is deliberate: with `--append-only`, a compromised VPS can write
+# new snapshots but cannot delete or rewrite old ones. Pruning is therefore a
+# manual, local operation from THIS machine (see deploy/README.md), which is
+# the correct trade — automatic retention is worth less than backups that
+# ransomware cannot erase.
+
+services:
+  restic-rest-server:
+    image: restic/rest-server:0.14.0
+    container_name: tl-backup-server
+    restart: unless-stopped
+    environment:
+      # --append-only: VPS can add snapshots, never delete them.
+      # --private-repos: each user only sees its own repo path.
+      OPTIONS: --append-only --private-repos
+      # Authentication stays ON (htpasswd in /data/.htpasswd, created with
+      # `docker exec tl-backup-server create_user <name> <password>`).
+      # Tailnet-only binding is the first gate; the password is the second —
+      # any tailnet device could otherwise read every production dump.
+    ports:
+      # Bound to the TAILNET address only. Never 0.0.0.0 — this holds every
+      # production database dump.
+      - "${BACKUP_BIND_IP:-100.120.126.42}:${BACKUP_PORT:-8000}:8000"
+    volumes:
+      # E: has ~930 GB free and is otherwise unused. Windows path via Docker
+      # Desktop's drive sharing.
+      - "E:/acme-commerce-backups:/data"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/ >/dev/null 2>&1 || exit 0"]
+      interval: 60s
+      timeout: 10s
+      retries: 3

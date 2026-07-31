@@ -1,0 +1,263 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@source "../../../node_modules/@delmaredigital/payload-puck";
+
+/*
+ * Acme Commerce Semantic Design Tokens
+ *
+ * These CSS custom properties power ALL payload-puck built-in components
+ * (Accordion, Button, Card, Section, Container, Flex, Grid, etc.)
+ * and all custom blocks. Puck components use Tailwind classes like
+ * bg-background, text-foreground, bg-card, border-border, etc.
+ *
+ * The @theme inline directive tells Tailwind v4 to generate utility
+ * classes from these variable references, enabling dark mode support.
+ *
+ * Brand reference: the brand guidelines
+ */
+
+/* Light mode (default) */
+:root {
+  --tl-background: #ffffff;
+  --tl-foreground: #0f172a;
+  --tl-card: #f8fafc;
+  --tl-card-foreground: #0f172a;
+  --tl-muted: #f1f5f9;
+  --tl-muted-foreground: #64748b;
+  --tl-primary: #0d9488;
+  --tl-primary-foreground: #ffffff;
+  --tl-secondary: #88d8e8;
+  --tl-secondary-foreground: #0f172a;
+  --tl-accent: #f0fdfa;
+  --tl-accent-foreground: #0f172a;
+  --tl-border: #e2e8f0;
+  --tl-input: #e2e8f0;
+  --tl-ring: #0d9488;
+  --tl-destructive: #ef4444;
+  --tl-destructive-foreground: #ffffff;
+}
+
+/* Dark mode — explicit toggle (class or data attribute) */
+[data-theme="dark"],
+.dark {
+  --tl-background: #0d1117;
+  --tl-foreground: #e2e8f0;
+  --tl-card: #161b22;
+  --tl-card-foreground: #e2e8f0;
+  --tl-muted: #1e293b;
+  --tl-muted-foreground: #94a3b8;
+  --tl-primary: #4ecdc4;
+  --tl-primary-foreground: #0d1117;
+  --tl-secondary: #88d8e8;
+  --tl-secondary-foreground: #0d1117;
+  --tl-accent: #1e293b;
+  --tl-accent-foreground: #e2e8f0;
+  --tl-border: #30363d;
+  --tl-input: #30363d;
+  --tl-ring: #4ecdc4;
+  --tl-destructive: #f87171;
+  --tl-destructive-foreground: #0d1117;
+}
+
+/* Dark mode — OS preference */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tl-background: #0d1117;
+    --tl-foreground: #e2e8f0;
+    --tl-card: #161b22;
+    --tl-card-foreground: #e2e8f0;
+    --tl-muted: #1e293b;
+    --tl-muted-foreground: #94a3b8;
+    --tl-primary: #4ecdc4;
+    --tl-primary-foreground: #0d1117;
+    --tl-secondary: #88d8e8;
+    --tl-secondary-foreground: #0d1117;
+    --tl-accent: #1e293b;
+    --tl-accent-foreground: #e2e8f0;
+    --tl-border: #30363d;
+    --tl-input: #30363d;
+    --tl-ring: #4ecdc4;
+    --tl-destructive: #f87171;
+    --tl-destructive-foreground: #0d1117;
+  }
+}
+
+/* Register tokens with Tailwind v4 — generates bg-background, text-foreground, etc. */
+@theme inline {
+  --color-background: var(--tl-background);
+  --color-foreground: var(--tl-foreground);
+  --color-card: var(--tl-card);
+  --color-card-foreground: var(--tl-card-foreground);
+  --color-muted: var(--tl-muted);
+  --color-muted-foreground: var(--tl-muted-foreground);
+  --color-primary: var(--tl-primary);
+  --color-primary-foreground: var(--tl-primary-foreground);
+  --color-secondary: var(--tl-secondary);
+  --color-secondary-foreground: var(--tl-secondary-foreground);
+  --color-accent: var(--tl-accent);
+  --color-accent-foreground: var(--tl-accent-foreground);
+  --color-border: var(--tl-border);
+  --color-input: var(--tl-input);
+  --color-ring: var(--tl-ring);
+  --color-destructive: var(--tl-destructive);
+  --color-destructive-foreground: var(--tl-destructive-foreground);
+
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-serif: "Spectral", "Iowan Old Style", Georgia, serif;
+}
+
+/*
+ * Blueprint brand tokens — canonical source:
+ * "Logo branding assets suite7" (turn 2/1d palette ruling, 2026-07-28).
+ * One hue family per brand, four roles: deep / bright / action / glow.
+ * On white each family marks tags and buttons with *deep*; on navy with
+ * *action* and *glow* — that inversion is the whole colour API.
+ */
+:root {
+  --tgp-deep: #17a97f;
+  --tgp-bright: #3fd9a8;
+  --tgp-action: #1fbf8f;
+  --tgp-glow: #63ecc4;
+  --tgp-button: #0f8f6b;
+  --tgp-tint: #eafaf3;
+
+  --snm-deep: #5ec3e2;
+  --snm-bright: #7cd2ec;
+  --snm-action: #74cde6;
+  --snm-glow: #a5e0f2;
+  --snm-store-button: #2b93b8;
+  --snm-tint: #edf8fc;
+  --snm-aqua: #2ba2c8;
+  --snm-aqua-hover: #1b8bb0;
+
+  --tlr-day-action: #4d84f0;
+  --tlr-bright: #2a55c9;
+  --tlr-night-action: #16224a;
+  --tlr-night-deep: #0b1228;
+  --tlr-cart-badge: #7a6fdc;
+  --tlr-link: #8f86e4;
+
+  --space-0: #070b16;
+  --space-1: #0b1224;
+  --space-2: #111a32;
+  --space-3: #1b2540;
+  --space-ink-2: #8ea2c4;
+  --space-ink: #eef4ff;
+}
+
+/* Storefront ground: light = the fallbacks, dark = the .storefront-vars set. */
+.storefront-body {
+  background: var(--bg, #ffffff);
+  color: var(--ink, #0f172a);
+}
+
+/* The spectral hairlines, exact stops from the blueprints. TGP's was removed
+   (the owner ruling 2026-07-29): the hairline is the TLR/SNM family signature, and
+   TGP must not visually read as a related entity. */
+.hairline-snm {
+  background: linear-gradient(105deg, #cfe2f4 0%, #7cd2ec 20%, #5f86d8 42%, #8f83e0 60%, #b9a6e8 72%, #d5e4f4 86%, #9fc2e8 100%);
+}
+.hairline-tlr {
+  background: linear-gradient(90deg, #8f86e4 0%, #9b90ea 11%, #b4acf2 22%, #a5e0f2 32%, #74cde6 40%, #5fc8f5 46%, #4fbef8 50%, #5fc8f5 54%, #74cde6 60%, #63ecc4 74%, #3fd9a8 87%, #17a97f 100%);
+}
+
+/* Orbit site links carry the one aqua; scoped so the storefronts keep theirs. */
+/* Brand-scoped commerce accent (the owner ruling 2026-07-29): teal is Orbit's
+   signature and must not bleed onto other brands' surfaces. The infra routes
+   (cart/checkout/login/account) and generic blocks colour from `primary`, so
+   the tenant layout stamps a brand class on <body>: TLR takes the house
+   purple, TGP its green (var() so the dark token flows through), SNM keeps
+   the teal default. Product detail pages additionally override per product
+   FAMILY — a TGP reagent viewed on acme-commerce shows green, a Orbit
+   product teal (see ProductDetailBlock). */
+.brand-tlr {
+  --tl-primary: #7a6fdc;
+  --tl-primary-foreground: #ffffff;
+}
+.brand-tgp {
+  --tl-primary: var(--tgp-btn, #0f8f6b);
+  --tl-primary-foreground: var(--tgp-btn-ink, #ffffff);
+}
+
+.snm-scope a { color: var(--snm-aqua); }
+.snm-scope a:hover { color: var(--snm-aqua-hover); }
+
+/*
+ * Orbit theme-swapped assets (canonical: one element per mark; the file
+ * swaps with the theme scope, no duplicate DOM). Placement rule 9h: emblem
+ * files carry ~17% transparent margin — place by the VISIBLE circle
+ * (background-size ≈ box × 1.4877, offset ≈ −24.4% of box), never by the file.
+ */
+.em-auto {
+  background-image: url(/brand/snm/emblem-light.svg);
+  background-repeat: no-repeat;
+}
+.badge-auto {
+  background-image: url(/brand/snm/badge-powered-horizontal-light.svg);
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+.seal-auto {
+  background-image: url(/brand/snm/seal-combined-light.svg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  mix-blend-mode: multiply;
+  opacity: .48;
+}
+[data-theme="dark"] .em-auto, .dark .em-auto { background-image: url(/brand/snm/emblem-dark.svg); }
+[data-theme="dark"] .badge-auto, .dark .badge-auto { background-image: url(/brand/snm/badge-powered-horizontal-dark.svg); }
+[data-theme="dark"] .seal-auto, .dark .seal-auto { background-image: url(/brand/snm/seal-combined-dark.svg); mix-blend-mode: screen; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .em-auto { background-image: url(/brand/snm/emblem-dark.svg); }
+  :root:not([data-theme="light"]) .badge-auto { background-image: url(/brand/snm/badge-powered-horizontal-dark.svg); }
+  :root:not([data-theme="light"]) .seal-auto { background-image: url(/brand/snm/seal-combined-dark.svg); mix-blend-mode: screen; }
+}
+
+/*
+ * TLR/TGP storefront theme scope. The blueprint styles every themed value as
+ * var(--x, <light fallback>) — light mode needs no definitions at all; dark
+ * applies this override set (verbatim from the blueprint's themeVars script).
+ */
+[data-theme="dark"] .storefront-vars,
+.dark .storefront-vars {
+  --bg: #070b16; --card: #0b1224; --band: #080e1d;
+  --rule: #16203a; --rule-soft: #16203a; --card-rule: #131c33;
+  --ink: #eef4ff; --ink-2: #8ea2c4; --ink-3: #a9bbd8; --ink-4: #7f93b6; --ink-5: #5f7099;
+  --logo-rim: #74cde6; --logo-cross: #ffffff; --logo-base: #8ea2c4; --logo-glow: #a5e0f2;
+  --logo-bloom: .9; --logo-glass: rgba(150, 210, 240, .05);
+  --logo-b1: #2c86e8; --logo-b1o: .8; --logo-b2: #7fc8f5; --logo-b2o: .75;
+  --hero: radial-gradient(90% 130% at 50% 8%, #1a2a55 0%, #101a35 34%, #070b16 74%);
+  --hero-halo: radial-gradient(circle, rgba(140, 200, 255, .22) 0%, rgba(95, 134, 216, .09) 45%, rgba(7, 11, 22, 0) 72%);
+  --snm-hero: linear-gradient(200deg, #101a35 0%, #0b1426 46%, #070b16 82%);
+  --tgp-hero: linear-gradient(160deg, #0c2320 0%, #0a1628 48%, #070b16 82%);
+  --snm-wash: radial-gradient(62% 82% at 38% 34%, rgba(94, 195, 226, .24) 0%, rgba(11, 18, 36, 0) 74%), radial-gradient(58% 78% at 72% 66%, rgba(165, 224, 242, .16) 0%, rgba(11, 18, 36, 0) 76%);
+  --tgp-wash: radial-gradient(62% 82% at 38% 34%, rgba(63, 217, 168, .20) 0%, rgba(11, 18, 36, 0) 74%), radial-gradient(58% 78% at 72% 66%, rgba(23, 169, 127, .18) 0%, rgba(11, 18, 36, 0) 76%);
+  --snm-ink: #74cde6; --snm-tag: #74cde6;
+  --snm-btn: #2b93b8; --snm-btn-edge: #2b93b8; --snm-btn-ink: #ffffff;
+  --tgp-ink: #1fbf8f; --tgp-tag: #1fbf8f;
+  --tgp-btn: #0f8f6b; --tgp-btn-edge: #0f8f6b; --tgp-btn-ink: #ffffff;
+  --tg-letter: #eafff8; --tg-strand: #63ecc4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .storefront-vars {
+    --bg: #070b16; --card: #0b1224; --band: #080e1d;
+    --rule: #16203a; --rule-soft: #16203a; --card-rule: #131c33;
+    --ink: #eef4ff; --ink-2: #8ea2c4; --ink-3: #a9bbd8; --ink-4: #7f93b6; --ink-5: #5f7099;
+    --logo-rim: #74cde6; --logo-cross: #ffffff; --logo-base: #8ea2c4; --logo-glow: #a5e0f2;
+    --logo-bloom: .9; --logo-glass: rgba(150, 210, 240, .05);
+    --logo-b1: #2c86e8; --logo-b1o: .8; --logo-b2: #7fc8f5; --logo-b2o: .75;
+    --hero: radial-gradient(90% 130% at 50% 8%, #1a2a55 0%, #101a35 34%, #070b16 74%);
+    --hero-halo: radial-gradient(circle, rgba(140, 200, 255, .22) 0%, rgba(95, 134, 216, .09) 45%, rgba(7, 11, 22, 0) 72%);
+    --snm-hero: linear-gradient(200deg, #101a35 0%, #0b1426 46%, #070b16 82%);
+    --tgp-hero: linear-gradient(160deg, #0c2320 0%, #0a1628 48%, #070b16 82%);
+    --snm-wash: radial-gradient(62% 82% at 38% 34%, rgba(94, 195, 226, .24) 0%, rgba(11, 18, 36, 0) 74%), radial-gradient(58% 78% at 72% 66%, rgba(165, 224, 242, .16) 0%, rgba(11, 18, 36, 0) 76%);
+    --tgp-wash: radial-gradient(62% 82% at 38% 34%, rgba(63, 217, 168, .20) 0%, rgba(11, 18, 36, 0) 74%), radial-gradient(58% 78% at 72% 66%, rgba(23, 169, 127, .18) 0%, rgba(11, 18, 36, 0) 76%);
+    --snm-ink: #74cde6; --snm-tag: #74cde6;
+    --snm-btn: #2b93b8; --snm-btn-edge: #2b93b8; --snm-btn-ink: #ffffff;
+    --tgp-ink: #1fbf8f; --tgp-tag: #1fbf8f;
+    --tgp-btn: #0f8f6b; --tgp-btn-edge: #0f8f6b; --tgp-btn-ink: #ffffff;
+    --tg-letter: #eafff8; --tg-strand: #63ecc4;
+  }
+}
